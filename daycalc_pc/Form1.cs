@@ -28,6 +28,8 @@ namespace daycalc_pc
 
 		private void Form1_Load(object sender, EventArgs e)
 		{
+			getLatestData();
+
 			ni.Text = "WolfPaw Day Calc";
 			ni.Icon = Properties.Resources.clock2;
 			ni.Visible = true;
@@ -36,8 +38,6 @@ namespace daycalc_pc
 			ni.ContextMenuStrip = cms;
 			this.ShowInTaskbar = false;
 			this.Hide();
-
-			getLatestData();
 		}
 
 		private void Ni_MouseClick(object sender, MouseEventArgs e)
@@ -66,6 +66,9 @@ namespace daycalc_pc
 
 
 			drawnButton graph = new drawnButton();
+			graph.firstToday = firstToday;
+			graph.lastToday = lastToday;
+			graph._cms = cms;
 			
 
 			ToolStripMenuItem tmi_exit = new ToolStripMenuItem();
@@ -94,11 +97,15 @@ namespace daycalc_pc
 
 		public void getLatestData()
 		{
-			WebBrowser wb = new WebBrowser();
-			wb.Navigate("http://daycalc.byethost5.com/calldata.php?getdata=1&date=2017-11-15");
-			MessageBox.Show(wb.DocumentText);
+			//WebBrowser wb = new WebBrowser();
+			//wb.Navigate("http://daycalc.byethost5.com/calldata.php?getdata=1&date=2017-11-15");
+			//MessageBox.Show(wb.DocumentText);
 			//string ret = new WebClient().DownloadString("http://daycalc.byethost5.com/calldata.php?getdata=1&date=2017-11-15");
 			//MessageBox.Show(ret);
+
+			firstToday = new DateTime(2017, 11, 16, 7, 10, 0);
+			lastToday = new DateTime(2017, 11, 16, 10, 20, 0);
+
 		}
 	}
 
@@ -129,10 +136,131 @@ namespace daycalc_pc
 
 	public class drawnButton : ToolStripMenuItem
 	{
+		public DateTime? firstToday { get; set; }
+		public DateTime? lastToday { get; set; }
+		public ContextMenuStrip _cms { get; set; }
+
+		public drawnButton()
+		{
+			AutoSize = false;
+
+		}
+
 		protected override void OnPaint(PaintEventArgs e)
 		{
-			base.OnPaint(e);
+			if (_cms != null && _cms.Bounds != null)
+			{
+				Height = 5 + 20 + 5 + (_cms.Bounds.Width - 4) + 5 + 40 + 5;
+				Width = _cms.Bounds.Width;
+			}
+
+			int[] data = calc.calcDay((DateTime)firstToday, (DateTime)lastToday);
+			int barWidth = Width;
+			int barHeight = 20;
+			int diagramWidth = Width - 4;
+			int diagramHeight = diagramWidth;
+			int drawTop = 5;
+			int workTime = Properties.Settings.Default.s_InTime;
+			double currentPercent = calc.getPercentages(workTime, data[1], percentModes._1_whatPercentageIsAOfB);
+			double lastMarkPercent = calc.getPercentages(workTime, data[4], percentModes._1_whatPercentageIsAOfB);
+
+			int currentBarGreen = (int)calc.getPercentages(currentPercent, barWidth, percentModes._2_whatIsAPercentageOfB);
+			int lastMarkBar = (int)calc.getPercentages(lastMarkPercent, barWidth, percentModes._2_whatIsAPercentageOfB);
+
+			e.Graphics.FillRectangle(Brushes.LightPink, new Rectangle(0, drawTop, barWidth, barHeight));
+			e.Graphics.FillRectangle(Brushes.ForestGreen, new Rectangle(0, drawTop, currentBarGreen, barHeight));
+			e.Graphics.FillRectangle(Brushes.Blue, new Rectangle(lastMarkBar - 1, drawTop, 2, barHeight));
+
+			drawTop += 25;
+
+			int currentPie = (int)calc.getPercentages(currentPercent, 360, percentModes._2_whatIsAPercentageOfB);
+			int lastMarkPie = (int)calc.getPercentages(lastMarkPercent, 360, percentModes._2_whatIsAPercentageOfB);
+
+			e.Graphics.FillPie(Brushes.LightPink, new Rectangle(2, drawTop, diagramWidth, diagramHeight), 360f, 360f);
+			e.Graphics.FillPie(Brushes.ForestGreen, new Rectangle(2, drawTop, diagramWidth, diagramHeight),270f,-currentPie);
+			e.Graphics.FillPie(Brushes.Blue, new Rectangle(2, drawTop, diagramWidth, diagramHeight), -lastMarkPie+270, -3);
+
+			drawTop += diagramHeight + 5;
+
+			e.Graphics.DrawString(currentPie + " | " + lastMarkPie, this.Font, Brushes.Black, new Point(2, drawTop));
 		}
+	}
+
+	public static class calc
+	{
+		/// <summary>
+		/// Calculates data in minutes.
+		/// returns array: [gotIn, beenIn, leaving, tillLeave];
+		/// </summary>
+		public static int[] calcDay(DateTime first, DateTime last)
+		{
+			int[] ret = new int[5];
+
+			//int now = (int)Math.Ceiling(DateTime.Now.TimeOfDay.TotalMinutes);
+			int now = (int)Math.Ceiling(new DateTime(2017, 11, 16, 14, 20, 0).TimeOfDay.TotalMinutes);
+			int gotIn = (int)Math.Ceiling(first.TimeOfDay.TotalMinutes);
+			int lastMark = (int)Math.Ceiling(last.TimeOfDay.TotalMinutes);
+			int leaving = gotIn + Properties.Settings.Default.s_InTime;
+			int beenIn = now - gotIn;
+			int tillLeave = leaving - now;
+
+			ret[0] = gotIn;
+			ret[1] = beenIn;
+			ret[2] = leaving;
+			ret[3] = tillLeave;
+			ret[4] = lastMark - gotIn;
+
+			return ret;
+		}
+
+		/// <summary>
+		/// Returns percentage values of a and b in 3 different calculations.
+		/// <para>1: b = c / a * 100</para>
+		/// <para>2: c = b / 100 * a</para>
+		/// <para>3: a = c / b * 100</para>
+		/// </summary>
+		/// <param name="a">First Number</param>
+		/// <param name="b">Second Number</param>
+		/// <param name="pmo">Percentage method</param>
+		/// <returns>Returns Double value of calculation</returns>
+		public static double getPercentages(double a, double b, percentModes pmo)
+		{
+			double ret = 0d;
+
+			switch (pmo)
+			{
+				//b = c / a * 100
+				case percentModes._1_whatPercentageIsAOfB:
+					ret = (b / a) * 100;
+					break;
+
+				//c = b / 100 * a
+				case percentModes._2_whatIsAPercentageOfB:
+					ret = (b / 100) * a;
+					break;
+
+				//a = c / b * 100
+				case percentModes._3_ofWhatIsAPercentageB:
+					ret = (b / a) * 100;
+					break;
+			}
+
+			return ret;
+		}
+
+	}
+
+	/// <summary>
+	/// <para>public enum percentModes	//200 % 20 = 40</para>
+	/// <para>_1_whatPercentageIsAOfB,	//what is 20</para>
+	/// <para>_2_whatIsAPercentageOfB,	//what is 40</para>
+	/// <para>_3_ofWhatIsAPercentageB		//what is 200</para>
+	/// </summary>
+	public enum percentModes    //200 % 20 = 40
+	{
+		_1_whatPercentageIsAOfB,   //what is 20
+		_2_whatIsAPercentageOfB,   //what is 40
+		_3_ofWhatIsAPercentageB    //what is 200
 	}
 
 }
