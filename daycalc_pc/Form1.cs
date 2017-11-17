@@ -182,7 +182,11 @@ namespace daycalc_pc
 
 			drawTop += diagramHeight + 5;
 
-			e.Graphics.DrawString(currentPie + " | " + lastMarkPie, this.Font, Brushes.Black, new Point(2, drawTop));
+			string gotins = (data[0] / 60).ToString().PadLeft(2,'0') + ":" + (data[0] % 60).ToString().PadLeft(2, '0');
+			string leavings = (data[2] / 60).ToString().PadLeft(2, '0') + ":" + (data[2] % 60).ToString().PadLeft(2, '0');
+			string leavingIns = (data[3] / 60).ToString().PadLeft(2, '0') + ":" + (data[3] % 60).ToString().PadLeft(2, '0');
+
+			e.Graphics.DrawString("Got in: " + gotins + "\r\nLeaving: " + leavings + "\r\nLeaving in: " + leavingIns, this.Font, Brushes.Black, new Point(2, drawTop));
 		}
 	}
 
