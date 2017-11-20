@@ -95,13 +95,21 @@ namespace daycalc_pc
 			while (ni.Visible) { ni.Visible = false; }
 		}
 
+		public void login()
+		{
+			string username = "";
+			string password = "";
+
+		}
+
 		public void getLatestData()
 		{
 			//WebBrowser wb = new WebBrowser();
 			//wb.Navigate("http://daycalc.byethost5.com/calldata.php?getdata=1&date=2017-11-15");
 			//MessageBox.Show(wb.DocumentText);
-			//string ret = new WebClient().DownloadString("http://daycalc.byethost5.com/calldata.php?getdata=1&date=2017-11-15");
-			//MessageBox.Show(ret);
+
+			string ret = new WebClient().DownloadString("http://wpss.atoldavid.hu/api/calldata.php?getdata=1");
+			MessageBox.Show(ret);
 
 			firstToday = new DateTime(2017, 11, 16, 7, 10, 0);
 			lastToday = new DateTime(2017, 11, 16, 10, 20, 0);
