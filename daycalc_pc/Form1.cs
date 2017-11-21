@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
@@ -18,6 +19,7 @@ namespace daycalc_pc
 
 		public DateTime? firstToday = null;
 		public DateTime? lastToday = null;
+		public CookieContainer cookies = new CookieContainer();
 
 		public Form1()
 		{
@@ -97,18 +99,49 @@ namespace daycalc_pc
 
 		public void login()
 		{
-			string username = "";
-			string password = "";
+			string loginurl = "http://wpss.atoldavid.hu/api/rl.php?login=1";
+			string username = "WolfyD";
+			string password = "Alpha666";
+
+			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(loginurl);
+			req.CookieContainer = cookies;
+			req.Headers.Add("un:" + username);
+			req.Headers.Add("pw1:" + password);
+			req.Method = "POST";
+
+			HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
+
 
 		}
 
 		public void getLatestData()
 		{
-			//WebBrowser wb = new WebBrowser();
-			//wb.Navigate("http://daycalc.byethost5.com/calldata.php?getdata=1&date=2017-11-15");
-			//MessageBox.Show(wb.DocumentText);
+			string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1&date=2017-11-20";
 
-			string ret = new WebClient().DownloadString("http://wpss.atoldavid.hu/api/calldata.php?getdata=1");
+			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+			req.CookieContainer.Add(");
+			req.Method = "GET";
+			string ret = "";
+			HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
+			byte[] buffer = new byte[1024];
+			using (var s = new MemoryStream())
+			{
+				using (Stream r = resp.GetResponseStream())
+				{
+
+					int br = 0;
+					while ((br = r.Read(buffer, 0, buffer.Length)) > 0)
+					{
+						s.Write(buffer, 0, br);
+					}
+
+				}
+
+				ret = Encoding.UTF8.GetString(s.ToArray());
+
+			}
+
+			//string ret = new WebClient().DownloadString("http://wpss.atoldavid.hu/api/calldata.php?getdata=1");
 			MessageBox.Show(ret);
 
 			firstToday = new DateTime(2017, 11, 16, 7, 10, 0);
