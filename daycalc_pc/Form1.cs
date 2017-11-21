@@ -9,6 +9,14 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Bson;
+using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Schema;
+using Newtonsoft.Json.Serialization;
+
+
 
 namespace daycalc_pc
 {
@@ -19,7 +27,9 @@ namespace daycalc_pc
 
 		public DateTime? firstToday = null;
 		public DateTime? lastToday = null;
-		public CookieContainer cookies = new CookieContainer();
+		public CookieContainer ccont = new CookieContainer();
+		public string cookiename = "";
+		public string cookievalue = "";
 
 		public Form1()
 		{
@@ -30,7 +40,8 @@ namespace daycalc_pc
 
 		private void Form1_Load(object sender, EventArgs e)
 		{
-			getLatestData();
+			login();
+			//getLatestData();
 
 			ni.Text = "WolfPaw Day Calc";
 			ni.Icon = Properties.Resources.clock2;
@@ -103,23 +114,41 @@ namespace daycalc_pc
 			string username = "WolfyD";
 			string password = "Alpha666";
 
+			string logindata = string.Format("un={0}&pw1={1}&Login=Login",username,password);
+			byte[] data = Encoding.UTF8.GetBytes(logindata);
+
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(loginurl);
-			req.CookieContainer = cookies;
-			req.Headers.Add("un:" + username);
-			req.Headers.Add("pw1:" + password);
+			req.ContentType = "application/x-www-form-urlencoded";
 			req.Method = "POST";
+			req.ContentLength = data.Length;
+			req.CookieContainer = ccont;
 
-			HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
+			using (Stream stream = req.GetRequestStream())
+			{
+				stream.Write(data, 0, data.Length);
+			}
 
+			using (HttpWebResponse response = (HttpWebResponse)req.GetResponse())
+			{
+				if (response.Cookies.Count > 0)
+				{
+					cookiename = response.Cookies[0].Name;
+					cookievalue = response.Cookies[0].Value;
+				}
+			}
 
+			//HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
+			getLatestData();
 		}
 
 		public void getLatestData()
 		{
-			string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1&date=2017-11-20";
+			string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1";
+			//string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1&date=2017-11-20";
 
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.CookieContainer.Add(");
+			req.CookieContainer = new CookieContainer();
+			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
 			req.Method = "GET";
 			string ret = "";
 			HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
@@ -141,15 +170,36 @@ namespace daycalc_pc
 
 			}
 
-			//string ret = new WebClient().DownloadString("http://wpss.atoldavid.hu/api/calldata.php?getdata=1");
-			MessageBox.Show(ret);
+			Console.WriteLine(ret);
+			
+			JObject jo = JObject.Parse(ret);
+			IList<JToken> results = jo["data"].Children().ToList();
 
-			firstToday = new DateTime(2017, 11, 16, 7, 10, 0);
-			lastToday = new DateTime(2017, 11, 16, 10, 20, 0);
+			List<string> indatetimes = new List<string>();
+			List<string> outdatetimes = new List<string>();
 
+			foreach(var v in results)
+			{
+				if(v["io"].Value<string>() == "1")
+				{
+					indatetimes.Add(v["date"] + " " + v["time"]);
+				}
+				else
+				{
+					outdatetimes.Add(v["date"] + " " + v["time"]);
+				}
+			}
+
+			string firstin = indatetimes.Min(x => x);
+			string lastout = outdatetimes.Max(x => x);
+
+			Console.WriteLine(firstin + " || " + lastout);
+
+			firstToday = Convert.ToDateTime(firstin);
+			lastToday = Convert.ToDateTime(lastout);
 		}
 	}
-
+	
 
 	public class drawnTitle : ToolStripMenuItem
 	{
