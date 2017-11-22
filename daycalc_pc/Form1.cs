@@ -30,12 +30,36 @@ namespace daycalc_pc
 		public CookieContainer ccont = new CookieContainer();
 		public string cookiename = "";
 		public string cookievalue = "";
+		public int refreshRate = 10;
+		public int currentSec = 0;
+
+		Timer tim = new Timer();
 
 		public Form1()
 		{
 			Visible = false;
 			InitializeComponent();
 			Load += Form1_Load;
+			tim.Interval = 1000;
+			tim.Tick += Tim_Tick;
+			tim.Start();
+		}
+
+		private void Tim_Tick(object sender, EventArgs e)
+		{
+			if(currentSec % refreshRate == 0 && currentSec != 0)
+			{
+				sendLogout();
+				getLatestData();
+			}
+
+			if(currentSec % 600 == 0 && currentSec != 0)
+			{
+				sendDelete();
+				getLatestData();
+			}
+
+			currentSec++;
 		}
 
 		private void Form1_Load(object sender, EventArgs e)
@@ -70,9 +94,11 @@ namespace daycalc_pc
 
 			ToolStripMenuItem tmi_login = new ToolStripMenuItem();
 			tmi_login.Text = "Send Login";
+			tmi_login.Click += Tmi_login_Click;
 
 			ToolStripMenuItem tmi_logout = new ToolStripMenuItem();
 			tmi_logout.Text = "Send Logout";
+			tmi_logout.Click += Tmi_logout_Click;
 
 			ToolStripMenuItem tmi_openWindow = new ToolStripMenuItem();
 			tmi_openWindow.Text = "Show Window";
@@ -97,9 +123,21 @@ namespace daycalc_pc
 			
 		}
 
+		private void Tmi_logout_Click(object sender, EventArgs e)
+		{
+			sendLogout();
+		}
+
+		private void Tmi_login_Click(object sender, EventArgs e)
+		{
+			sendLogin();
+		}
+
 		private void Tmi_exit_Click(object sender, EventArgs e)
 		{
 			ni.Visible = false;
+			sendLogout();
+			sendDelete();
 			Application.Exit();
 		}
 
@@ -138,13 +176,13 @@ namespace daycalc_pc
 			}
 
 			//HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
+			sendLogin();
 			getLatestData();
 		}
 
 		public void getLatestData()
 		{
 			string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1";
-			//string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1&date=2017-11-20";
 
 			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
 			req.CookieContainer = new CookieContainer();
@@ -169,6 +207,7 @@ namespace daycalc_pc
 				ret = Encoding.UTF8.GetString(s.ToArray());
 
 			}
+			resp.Close();
 
 			Console.WriteLine(ret);
 			
@@ -198,6 +237,40 @@ namespace daycalc_pc
 			firstToday = Convert.ToDateTime(firstin);
 			lastToday = Convert.ToDateTime(lastout);
 		}
+
+		public void sendLogin()
+		{
+			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=I";
+
+			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+			req.CookieContainer = new CookieContainer();
+			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
+			req.Method = "GET";
+			req.GetResponse();
+		}
+
+		public void sendLogout()
+		{
+			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=O";
+
+			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+			req.CookieContainer = new CookieContainer();
+			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
+			req.Method = "GET";
+			req.GetResponse();
+		}
+
+		public void sendDelete()
+		{
+			string url = "http://wpss.atoldavid.hu/api/calldata.php?cleandata=1";
+
+			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
+			req.CookieContainer = new CookieContainer();
+			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
+			req.Method = "GET";
+			req.GetResponse();
+		}
+
 	}
 	
 
@@ -230,11 +303,26 @@ namespace daycalc_pc
 		public DateTime? firstToday { get; set; }
 		public DateTime? lastToday { get; set; }
 		public ContextMenuStrip _cms { get; set; }
+		public bool mouseOver = false;
+
 
 		public drawnButton()
 		{
 			AutoSize = false;
+			MouseEnter += DrawnButton_MouseEnter;
+			MouseLeave += DrawnButton_MouseLeave;
+		}
 
+		private void DrawnButton_MouseLeave(object sender, EventArgs e)
+		{
+			mouseOver = false;
+			Invalidate();
+		}
+
+		private void DrawnButton_MouseEnter(object sender, EventArgs e)
+		{
+			mouseOver = true;
+			Invalidate();
 		}
 
 		protected override void OnPaint(PaintEventArgs e)
@@ -271,6 +359,13 @@ namespace daycalc_pc
 			e.Graphics.FillPie(Brushes.ForestGreen, new Rectangle(2, drawTop, diagramWidth, diagramHeight),270f,-currentPie);
 			e.Graphics.FillPie(Brushes.Blue, new Rectangle(2, drawTop, diagramWidth, diagramHeight), -lastMarkPie+270, -3);
 
+			if (mouseOver)
+			{
+				string percentstr = currentPercent.ToString("0.00") + "%";
+				Size texts = TextRenderer.MeasureText(percentstr, this.Font);
+				e.Graphics.DrawString(percentstr, this.Font, Brushes.Black, new Point(2 + (diagramWidth / 2) - (texts.Width / 2), drawTop + (diagramHeight / 2) - (texts.Height / 2)));
+			}
+
 			drawTop += diagramHeight + 5;
 
 			string gotins = (data[0] / 60).ToString().PadLeft(2,'0') + ":" + (data[0] % 60).ToString().PadLeft(2, '0');
@@ -291,8 +386,8 @@ namespace daycalc_pc
 		{
 			int[] ret = new int[5];
 
-			//int now = (int)Math.Ceiling(DateTime.Now.TimeOfDay.TotalMinutes);
-			int now = (int)Math.Ceiling(new DateTime(2017, 11, 16, 14, 20, 0).TimeOfDay.TotalMinutes);
+			int now = (int)Math.Ceiling(DateTime.Now.TimeOfDay.TotalMinutes);
+			//int now = (int)Math.Ceiling(new DateTime(2017, 11, 16, 14, 20, 0).TimeOfDay.TotalMinutes);
 			int gotIn = (int)Math.Ceiling(first.TimeOfDay.TotalMinutes);
 			int lastMark = (int)Math.Ceiling(last.TimeOfDay.TotalMinutes);
 			int leaving = gotIn + Properties.Settings.Default.s_InTime;
