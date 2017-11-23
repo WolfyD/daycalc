@@ -30,7 +30,7 @@ namespace daycalc_pc
 		public CookieContainer ccont = new CookieContainer();
 		public string cookiename = "";
 		public string cookievalue = "";
-		public int refreshRate = 10;
+		public int refreshRate = 60;
 		public int currentSec = 0;
 
 		Timer tim = new Timer();
@@ -50,12 +50,6 @@ namespace daycalc_pc
 			if(currentSec % refreshRate == 0 && currentSec != 0)
 			{
 				sendLogout();
-				getLatestData();
-			}
-
-			if(currentSec % 600 == 0 && currentSec != 0)
-			{
-				sendDelete();
 				getLatestData();
 			}
 
@@ -102,6 +96,7 @@ namespace daycalc_pc
 
 			ToolStripMenuItem tmi_openWindow = new ToolStripMenuItem();
 			tmi_openWindow.Text = "Show Window";
+			tmi_openWindow.Click += Tmi_openWindow_Click;
 
 
 			drawnButton graph = new drawnButton();
@@ -123,6 +118,29 @@ namespace daycalc_pc
 			
 		}
 
+		private void Tmi_openWindow_Click(object sender, EventArgs e)
+		{
+			var frms = Application.OpenForms;
+			int i = 0;
+
+			foreach (Form f in frms)
+			{
+				if(f is Form2)
+				{
+					f.WindowState = FormWindowState.Normal;
+					f.Show();
+					f.BringToFront();
+					i++;
+					break;
+				}
+			}
+			if (i == 0)
+			{
+				Form2 f2 = new Form2();
+				f2.Show();
+			}
+		}
+
 		private void Tmi_logout_Click(object sender, EventArgs e)
 		{
 			sendLogout();
@@ -137,7 +155,6 @@ namespace daycalc_pc
 		{
 			ni.Visible = false;
 			sendLogout();
-			sendDelete();
 			Application.Exit();
 		}
 
@@ -176,99 +193,51 @@ namespace daycalc_pc
 			}
 
 			//HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
-			sendLogin();
+			
 			getLatestData();
 		}
 
 		public void getLatestData()
 		{
-			string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1";
-
-			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.CookieContainer = new CookieContainer();
-			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
-			req.Method = "GET";
-			string ret = "";
-			HttpWebResponse resp = (HttpWebResponse)req.GetResponse();
-			byte[] buffer = new byte[1024];
-			using (var s = new MemoryStream())
+			try
 			{
-				using (Stream r = resp.GetResponseStream())
+				string url = "http://wpss.atoldavid.hu/api/calldata.php?getdata=1&currentUser=" + cookievalue;
+				string ret = new WebClient().DownloadString(url);
+				
+				Console.WriteLine(ret);
+
+				JObject jo = JObject.Parse(ret);
+
+				string firstin = jo["date"].Value<string>() + " " +  jo["in_time"].Value<string>();
+				string lastout = jo["date"].Value<string>() + " " + jo["out_time"].Value<string>();
+
+				Console.WriteLine(firstin + " || " + lastout);
+
+				firstToday = Convert.ToDateTime(firstin);
+				lastToday = Convert.ToDateTime(lastout);
+
+				if(firstToday == null || lastToday == null)
 				{
-
-					int br = 0;
-					while ((br = r.Read(buffer, 0, buffer.Length)) > 0)
-					{
-						s.Write(buffer, 0, br);
-					}
-
+					sendLogin();
 				}
-
-				ret = Encoding.UTF8.GetString(s.ToArray());
 
 			}
-			resp.Close();
-
-			Console.WriteLine(ret);
-			
-			JObject jo = JObject.Parse(ret);
-			IList<JToken> results = jo["data"].Children().ToList();
-
-			List<string> indatetimes = new List<string>();
-			List<string> outdatetimes = new List<string>();
-
-			foreach(var v in results)
+			catch
 			{
-				if(v["io"].Value<string>() == "1")
-				{
-					indatetimes.Add(v["date"] + " " + v["time"]);
-				}
-				else
-				{
-					outdatetimes.Add(v["date"] + " " + v["time"]);
-				}
+
 			}
-
-			string firstin = indatetimes.Min(x => x);
-			string lastout = outdatetimes.Max(x => x);
-
-			Console.WriteLine(firstin + " || " + lastout);
-
-			firstToday = Convert.ToDateTime(firstin);
-			lastToday = Convert.ToDateTime(lastout);
 		}
 
 		public void sendLogin()
 		{
-			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=I";
-
-			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.CookieContainer = new CookieContainer();
-			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
-			req.Method = "GET";
-			req.GetResponse();
+			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=I&currentUser=" + cookievalue;
+			new WebClient().DownloadString(url);
 		}
 
 		public void sendLogout()
 		{
-			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=O";
-
-			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.CookieContainer = new CookieContainer();
-			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
-			req.Method = "GET";
-			req.GetResponse();
-		}
-
-		public void sendDelete()
-		{
-			string url = "http://wpss.atoldavid.hu/api/calldata.php?cleandata=1";
-
-			HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
-			req.CookieContainer = new CookieContainer();
-			req.CookieContainer.SetCookies(new Uri("http://wpss.atoldavid.hu/api/calldata.php"), cookiename + "=" + cookievalue);
-			req.Method = "GET";
-			req.GetResponse();
+			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=O&currentUser=" + cookievalue;
+			new WebClient().DownloadString(url);
 		}
 
 	}
@@ -344,20 +313,42 @@ namespace daycalc_pc
 			double lastMarkPercent = calc.getPercentages(workTime, data[4], percentModes._1_whatPercentageIsAOfB);
 
 			int currentBarGreen = (int)calc.getPercentages(currentPercent, barWidth, percentModes._2_whatIsAPercentageOfB);
+			int extraBarGreen = currentBarGreen - barWidth;
 			int lastMarkBar = (int)calc.getPercentages(lastMarkPercent, barWidth, percentModes._2_whatIsAPercentageOfB);
 
 			e.Graphics.FillRectangle(Brushes.LightPink, new Rectangle(0, drawTop, barWidth, barHeight));
 			e.Graphics.FillRectangle(Brushes.ForestGreen, new Rectangle(0, drawTop, currentBarGreen, barHeight));
-			e.Graphics.FillRectangle(Brushes.Blue, new Rectangle(lastMarkBar - 1, drawTop, 2, barHeight));
+			if (extraBarGreen <= 0)
+			{
+				e.Graphics.FillRectangle(Brushes.Blue, new Rectangle(lastMarkBar - 1, drawTop, 2, barHeight));
+			}
+			else
+			{
+				e.Graphics.FillRectangle(Brushes.Orange, new Rectangle(0, drawTop, extraBarGreen, barHeight / 2));
+				e.Graphics.FillRectangle(Brushes.Blue, new Rectangle(extraBarGreen - 1, drawTop, 2, barHeight));
+			}
 
-			drawTop += 25;
+
+			drawTop += 22;
 
 			int currentPie = (int)calc.getPercentages(currentPercent, 360, percentModes._2_whatIsAPercentageOfB);
+			int extraPie = currentPie - 360;
 			int lastMarkPie = (int)calc.getPercentages(lastMarkPercent, 360, percentModes._2_whatIsAPercentageOfB);
 
 			e.Graphics.FillPie(Brushes.LightPink, new Rectangle(2, drawTop, diagramWidth, diagramHeight), 360f, 360f);
 			e.Graphics.FillPie(Brushes.ForestGreen, new Rectangle(2, drawTop, diagramWidth, diagramHeight),270f,-currentPie);
-			e.Graphics.FillPie(Brushes.Blue, new Rectangle(2, drawTop, diagramWidth, diagramHeight), -lastMarkPie+270, -3);
+			if (extraPie <= 0)
+			{
+				e.Graphics.FillPie(Brushes.Blue, new Rectangle(2, drawTop, diagramWidth, diagramHeight), -lastMarkPie + 270, -3);
+			}
+			else
+			{
+				e.Graphics.FillPie(Brushes.Orange, new Rectangle(2 + (diagramWidth / 4), drawTop + (diagramHeight / 4), diagramWidth / 2, diagramHeight / 2), 270f, -extraPie);
+				e.Graphics.FillPie(Brushes.Blue, new Rectangle(2, drawTop, diagramWidth, diagramHeight), -extraPie + 270, -3);
+			}
+
+
+
 
 			if (mouseOver)
 			{
@@ -370,10 +361,31 @@ namespace daycalc_pc
 
 			string gotins = (data[0] / 60).ToString().PadLeft(2,'0') + ":" + (data[0] % 60).ToString().PadLeft(2, '0');
 			string leavings = (data[2] / 60).ToString().PadLeft(2, '0') + ":" + (data[2] % 60).ToString().PadLeft(2, '0');
-			string leavingIns = (data[3] / 60).ToString().PadLeft(2, '0') + ":" + (data[3] % 60).ToString().PadLeft(2, '0');
+			string leavingIns = getTTL((data[3] / 60).ToString().PadLeft(2, '0') + ":" + (data[3] % 60).ToString().PadLeft(2, '0'));
 
-			e.Graphics.DrawString("Got in: " + gotins + "\r\nLeaving: " + leavings + "\r\nLeaving in: " + leavingIns, this.Font, Brushes.Black, new Point(2, drawTop));
+			e.Graphics.DrawString("Got in: " + gotins + "\r\nLeaving: " + leavings + "\r\nTTL: " + leavingIns, this.Font, Brushes.Black, new Point(2, drawTop));
 		}
+
+		public string getTTL(string ttl)
+		{
+			string ret = "";
+
+			string[] ttls = new string[3];
+			
+			if (ttl.Contains("-"))
+			{
+				ttl = ttl.Replace("-", "");
+				ttls[0] = "-";
+			}
+
+			ttls[1] = ttl.Split(':')[0];
+			ttls[2] = ttl.Split(':')[1];
+
+			ret = ttls[0] + ttls[1].PadLeft(2, '0') + ":" + ttls[2].PadLeft(2, '0');
+
+			return ret;
+		}
+
 	}
 
 	public static class calc
@@ -387,7 +399,6 @@ namespace daycalc_pc
 			int[] ret = new int[5];
 
 			int now = (int)Math.Ceiling(DateTime.Now.TimeOfDay.TotalMinutes);
-			//int now = (int)Math.Ceiling(new DateTime(2017, 11, 16, 14, 20, 0).TimeOfDay.TotalMinutes);
 			int gotIn = (int)Math.Ceiling(first.TimeOfDay.TotalMinutes);
 			int lastMark = (int)Math.Ceiling(last.TimeOfDay.TotalMinutes);
 			int leaving = gotIn + Properties.Settings.Default.s_InTime;
