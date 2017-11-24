@@ -34,5 +34,29 @@ namespace daycalc_pc.Properties {
                 this["s_InTime"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string s_userName {
+            get {
+                return ((string)(this["s_userName"]));
+            }
+            set {
+                this["s_userName"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string s_Pass {
+            get {
+                return ((string)(this["s_Pass"]));
+            }
+            set {
+                this["s_Pass"] = value;
+            }
+        }
     }
 }

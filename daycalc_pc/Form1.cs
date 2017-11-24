@@ -15,8 +15,7 @@ using Newtonsoft.Json.Converters;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Schema;
 using Newtonsoft.Json.Serialization;
-
-
+using System.Reflection;
 
 namespace daycalc_pc
 {
@@ -32,6 +31,8 @@ namespace daycalc_pc
 		public string cookievalue = "";
 		public int refreshRate = 60;
 		public int currentSec = 0;
+
+		public drawnButton graph = new drawnButton();
 
 		Timer tim = new Timer();
 
@@ -82,9 +83,10 @@ namespace daycalc_pc
 			cms.ShowImageMargin = false;
 			cms.Font = new Font("Consolas", 10, FontStyle.Regular);
 			
-			drawnTitle tmi_title = new drawnTitle();
-			tmi_title.Text2 = "WolfPaw Day calc";
-			tmi_title._cms = cms;
+			drawnTitle tmi_title = new drawnTitle() {
+				Text2 = "WolfPaw Day calc",
+				_cms = cms
+			};
 
 			ToolStripMenuItem tmi_login = new ToolStripMenuItem();
 			tmi_login.Text = "Send Login";
@@ -99,7 +101,7 @@ namespace daycalc_pc
 			tmi_openWindow.Click += Tmi_openWindow_Click;
 
 
-			drawnButton graph = new drawnButton();
+			
 			graph.firstToday = firstToday;
 			graph.lastToday = lastToday;
 			graph._cms = cms;
@@ -148,7 +150,10 @@ namespace daycalc_pc
 
 		private void Tmi_login_Click(object sender, EventArgs e)
 		{
-			sendLogin();
+			if(MessageBox.Show("Are you sure you wish to overwrite your current Arrival time?","Are you sure?",MessageBoxButtons.YesNo,MessageBoxIcon.Question) == DialogResult.Yes)
+			{
+				sendLogin();
+			}
 		}
 
 		private void Tmi_exit_Click(object sender, EventArgs e)
@@ -219,12 +224,19 @@ namespace daycalc_pc
 				if(firstToday == null || lastToday == null)
 				{
 					sendLogin();
+					graph.firstToday = firstToday;
+					graph.lastToday = lastToday;
+				}
+				else
+				{
+					graph.firstToday = firstToday;
+					graph.lastToday = lastToday;
 				}
 
 			}
-			catch
+			catch(Exception ex)
 			{
-
+				MessageBox.Show(ex.ToString());
 			}
 		}
 
@@ -232,12 +244,15 @@ namespace daycalc_pc
 		{
 			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=I&currentUser=" + cookievalue;
 			new WebClient().DownloadString(url);
+			getLatestData();
 		}
 
 		public void sendLogout()
 		{
 			string url = "http://wpss.atoldavid.hu/api/calldata.php?setdata=1&io=O&currentUser=" + cookievalue;
 			new WebClient().DownloadString(url);
+			getLatestData();
+			
 		}
 
 	}
@@ -247,18 +262,40 @@ namespace daycalc_pc
 	{
 		public String Text2 { get; set; }
 		public ContextMenuStrip _cms { get; set; }
+		public bool cancelClosing = false;
+		public bool mdown = false;
+		public Point loc = new Point();
+
+		public const int WM_NCLBUTTONDOWN = 0xA1;
+		public const int HT_CAPTION = 0x2;
+
+		[System.Runtime.InteropServices.DllImportAttribute("user32.dll")]
+		public static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+		[System.Runtime.InteropServices.DllImportAttribute("user32.dll")]
+		public static extern bool ReleaseCapture();
 
 		public drawnTitle()
 		{
 			AutoSize = false;
 			Margin = new Padding(0, -1, 0, 0);
+			Height = 15;
+			MouseDown += DrawnTitle_MouseDown;
 		}
 
+		private void DrawnTitle_MouseDown(object sender, MouseEventArgs e)
+		{
+			if (e.Button == MouseButtons.Left)
+			{
+				ReleaseCapture();
+				SendMessage(_cms.Handle, WM_NCLBUTTONDOWN, HT_CAPTION, 0);
+			}
+			
+		}
+		
 		protected override void OnPaint(PaintEventArgs e)
 		{
 			if(_cms != null && _cms.Bounds != null)
 			{
-				Height = 15;
 				Width = _cms.Bounds.Width;
 			}
 			
@@ -274,13 +311,23 @@ namespace daycalc_pc
 		public ContextMenuStrip _cms { get; set; }
 		public bool mouseOver = false;
 
+		Timer t = new Timer();
 
 		public drawnButton()
 		{
 			AutoSize = false;
 			MouseEnter += DrawnButton_MouseEnter;
 			MouseLeave += DrawnButton_MouseLeave;
+			t.Interval = 1000;
+			t.Tick += T_Tick;
+			t.Start();
 		}
+
+		private void T_Tick(object sender, EventArgs e)
+		{
+			Invalidate();
+		}
+		
 
 		private void DrawnButton_MouseLeave(object sender, EventArgs e)
 		{
